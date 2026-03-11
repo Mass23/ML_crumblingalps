@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Data (large files, not tracked)
+data/raw-images/
+data/training/
+data/attributions.json
+
+# Model checkpoints
+checkpoints/
+
+# Output videos
+outputs/
+videos/
+gifs/
+final-images/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
