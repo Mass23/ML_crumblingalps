@@ -15,8 +15,8 @@ Usage:
         --output-dir data/training \\
         --duration 4 \\
         --fps 14 \\
-        --target-width 512 \\
-        --target-height 512 \\
+        --target-width 1920 \\
+        --target-height 1080 \\
         --num-workers 4
 """
 
@@ -46,7 +46,7 @@ except ImportError:
 
 def load_and_preprocess_image(
     filepath: str,
-    target_size: Tuple[int, int] = (512, 512),
+    target_size: Tuple[int, int] = (2880, 1620),
 ) -> Optional[Image.Image]:
     """
     Load a single image file and apply preprocessing.
@@ -153,7 +153,7 @@ def simulate_landslides(
 
     h, w, _ = base_image.shape
     active_landslides = []
-    MAX_ACTIVE = 500
+    MAX_ACTIVE = 1000
 
     def start_landslide(
         block_size: int = 400,
