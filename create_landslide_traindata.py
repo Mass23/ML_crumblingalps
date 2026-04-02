@@ -173,6 +173,7 @@ def simulate_landslides(
             x = random.randint(0, w - block_size)
         if y is None:
             y = random.randint(0, h // 2 - block_size)
+            
         fall_distance = random.randint(150, max_fall_dist)
         duration_frames = random.randint(20, 200)
         dy_per_frame = fall_distance / duration_frames
@@ -200,7 +201,7 @@ def simulate_landslides(
 
         if len(active_landslides) < MAX_ACTIVE:
             if random.random() < 0.05:
-                active_landslides.append(start_landslide(random.randint(100, 500)))
+                active_landslides.append(start_landslide(random.randint(200, 600)))
 
         new_landslides = []
         for ls in active_landslides:
@@ -359,8 +360,8 @@ def process_image_batch(
     output_dir: str,
     duration: int = 4,
     fps: int = 14,
-    target_width: int = 512,
-    target_height: int = 512,
+    target_width: int = 2880,
+    target_height: int = 1620,
 ) -> None:
     """
     Process a batch of images sequentially (no multiprocessing).

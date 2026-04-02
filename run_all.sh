@@ -4,26 +4,4 @@
 
 
 # Process 5 images → generate data → train → checkpoint → repeat
-python train.py --mode batch \
-  --images-dir data/raw-images \
-  --data-dir data/training \
-  --batch-size 5 \
-  --num-epochs 10
-
-python train.py --mode batch \
-  --images-dir data/raw-images \
-  --data-dir data/training \
-  --batch-size 5 \
-  --num-epochs 10
-
-python train.py --mode batch \
-  --images-dir data/raw-images \
-  --data-dir data/training \
-  --batch-size 5 \
-  --num-epochs 10
-
-python train.py --mode batch \
-  --images-dir data/raw-images \
-  --data-dir data/training \
-  --batch-size 5 \
-  --num-epochs 10
+python3 train.py --images-dir data/raw-images --data-dir data/training --batch-size 5 --num-epochs 20
