@@ -7,17 +7,11 @@ For each input image, produces:
   - Individual video frames (frames_{name}/frame_XXXXX.png)
   - A video file (video_{name}.mp4)
 
-All core landslide simulation logic is preserved from the original script.
+All core landslide simulation logic is preserved.
 
-Usage:
-    python create_landslide_traindata.py \\
-        --input-dir data/raw-images \\
-        --output-dir data/training \\
-        --duration 4 \\
-        --fps 14 \\
-        --target-width 1920 \\
-        --target-height 1080 \\
-        --num-workers 4
+Can be used as:
+  1. CLI: python create_landslide_traindata.py --input-dir data/raw-images --output-dir data/training
+  2. Module: from create_landslide_traindata import process_image_batch, process_image, simulate_landslides
 """
 
 import os
@@ -30,7 +24,7 @@ import cv2
 from pathlib import Path
 from multiprocessing import Pool
 from functools import partial
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 try:
     from pillow_heif import register_heif_opener
@@ -358,6 +352,38 @@ def process_image(
     save_video(frames, str(video_mp4), fps=fps)
 
     print(f"  Done: {name} -> {len(frames)} frames saved")
+
+
+def process_image_batch(
+    image_paths: List[str],
+    output_dir: str,
+    duration: int = 4,
+    fps: int = 14,
+    target_width: int = 512,
+    target_height: int = 512,
+) -> None:
+    """
+    Process a batch of images sequentially (no multiprocessing).
+
+    This is the main function to call from train.py for batch-based training.
+
+    Args:
+        image_paths: List of input image file paths
+        output_dir: Root directory for training data output
+        duration: Video duration in seconds
+        fps: Frames per second
+        target_width: Target image width in pixels
+        target_height: Target image height in pixels
+    """
+    print(f"\nProcessing batch of {len(image_paths)} images...")
+    
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    
+    for filepath in image_paths:
+        process_image(filepath, output_dir, duration, fps, target_width, target_height)
+    
+    print(f"Batch processing complete!")
 
 
 def process_image_worker(args: tuple) -> None:

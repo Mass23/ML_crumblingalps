@@ -4,8 +4,9 @@ download_images.py
 Downloads Alps/mountain landscape images from Wikimedia Commons using their public API.
 Images are freely licensed (Creative Commons) and saved with proper attribution tracking.
 
-Usage:
-    python download_images.py --num-images 300 --output-dir data/raw-images
+Can be used as:
+  1. CLI: python download_images.py --num-images 300 --output-dir data/raw-images
+  2. Module: from download_images import get_image_batch, search_wikimedia_images, download_image
 """
 
 import os
@@ -14,7 +15,7 @@ import time
 import argparse
 import requests
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from urllib.parse import urlparse
 
 # Wikimedia Commons API endpoint
@@ -203,6 +204,31 @@ def save_attributions(attributions: dict, attr_path: Path) -> None:
     """Save attributions dict to JSON file."""
     with open(attr_path, "w", encoding="utf-8") as f:
         json.dump(attributions, f, indent=2, ensure_ascii=False)
+
+
+def get_image_batch(image_dir: str, batch_size: int = 5, start_idx: int = 0) -> List[str]:
+    """
+    Fetch a batch of image file paths from a directory.
+
+    Args:
+        image_dir: Directory containing images
+        batch_size: Number of images to return
+        start_idx: Starting index in the sorted list of images
+
+    Returns:
+        List of image file paths (up to batch_size items)
+    """
+    image_dir = Path(image_dir)
+    patterns = ["*.jpg", "*.jpeg", "*.JPG", "*.JPEG", "*.png", "*.PNG", "*.HEIC", "*.heic", "*.heif", "*.HEIF"]
+    
+    all_images = []
+    for pattern in patterns:
+        all_images.extend(sorted(image_dir.glob(pattern)))
+    
+    all_images = sorted(set(all_images))
+    end_idx = min(start_idx + batch_size, len(all_images))
+    
+    return [str(img) for img in all_images[start_idx:end_idx]]
 
 
 def main() -> None:
