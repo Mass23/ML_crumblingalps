@@ -287,5 +287,29 @@ def main() -> None:
     print(f"Attribution data saved to '{attr_path}'")
 
 
+def get_batch_of_images(output_dir: str, num_images: int = 5, start_index: int = 0) -> list[str]:
+    """
+    Return a batch of image file paths from an existing directory.
+
+    Args:
+        output_dir: Directory containing downloaded images
+        num_images: Number of images to include in the batch
+        start_index: Starting index into the sorted list of images
+
+    Returns:
+        List of absolute file paths for the batch (may be shorter than
+        num_images if fewer images remain after start_index)
+    """
+    output_path = Path(output_dir)
+    patterns = ["*.jpg", "*.jpeg", "*.JPG", "*.JPEG", "*.png", "*.PNG"]
+
+    filepaths: list[str] = []
+    for pattern in patterns:
+        filepaths.extend(str(p) for p in output_path.glob(pattern))
+    filepaths = sorted(set(filepaths))
+
+    return filepaths[start_index : start_index + num_images]
+
+
 if __name__ == "__main__":
     main()

@@ -25,6 +25,7 @@ Usage:
 """
 
 import os
+import json
 import argparse
 import logging
 from pathlib import Path
@@ -465,12 +466,139 @@ def _save_lora_weights(unet: UNetSpatioTemporalConditionModel, save_dir: str) ->
 
 
 # ---------------------------------------------------------------------------
+# Batch Pipeline
+# ---------------------------------------------------------------------------
+
+def run_batch_pipeline(args: argparse.Namespace) -> None:
+    """
+    Orchestrate the iterative batch pipeline:
+    get images → generate training data → train → checkpoint → repeat.
+
+    Args:
+        args: Parsed command-line arguments (must include batch-mode fields)
+    """
+    from download_images import get_batch_of_images
+    from create_landslide_traindata import process_image_batch
+
+    # Load or initialise batch progress tracking
+    progress_file = Path(args.batch_progress_file)
+    if progress_file.exists():
+        with open(progress_file, "r", encoding="utf-8") as f:
+            progress = json.load(f)
+        logger.info(f"Resuming from batch progress file: {progress_file} — {progress}")
+    else:
+        progress = {
+            "batches_completed": 0,
+            "images_processed": 0,
+            "last_checkpoint": None,
+        }
+
+    images_dir = Path(args.images_dir)
+    output_dir = Path(args.output_dir)
+    data_dir = Path(args.data_dir)
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    start_index: int = progress["images_processed"]
+    batches_run = 0
+
+    while True:
+        # Respect the --batches-to-process limit (−1 = unlimited)
+        if args.batches_to_process != -1 and batches_run >= args.batches_to_process:
+            logger.info(f"Reached --batches-to-process={args.batches_to_process} limit.")
+            break
+
+        # Step 1: Collect the next batch of raw images
+        batch_paths = get_batch_of_images(
+            str(images_dir),
+            num_images=args.image_batch_size,
+            start_index=start_index,
+        )
+        if not batch_paths:
+            logger.info("No more images to process. Batch pipeline complete.")
+            break
+
+        current_batch = progress["batches_completed"] + 1
+        logger.info(
+            f"=== Batch {current_batch}: {len(batch_paths)} image(s) "
+            f"(index {start_index}–{start_index + len(batch_paths) - 1}) ==="
+        )
+
+        # Step 2: Generate training data for this batch
+        logger.info(f"Generating training data for batch {current_batch}…")
+        metadata = process_image_batch(
+            image_paths=batch_paths,
+            output_dir=str(data_dir),
+            duration=args.generation_duration,
+            fps=args.fps,
+            target_width=args.image_size,
+            target_height=args.image_size,
+        )
+        successful = sum(1 for m in metadata if m["success"])
+        logger.info(
+            f"Training data ready: {successful}/{len(batch_paths)} image(s) succeeded"
+        )
+
+        # Step 3: Train on the accumulated dataset in data_dir
+        has_data = successful > 0 or next(data_dir.glob("source_*.png"), None) is not None
+        if has_data:
+            logger.info(f"Training model on batch {current_batch}…")
+            train_args = argparse.Namespace(**vars(args))
+            # Resume from the last saved checkpoint when available
+            last_ckpt = progress.get("last_checkpoint")
+            if last_ckpt and not Path(last_ckpt).exists():
+                logger.warning(
+                    f"Checkpoint '{last_ckpt}' listed in progress file no longer exists; "
+                    "starting training from scratch for this batch."
+                )
+                last_ckpt = None
+            train_args.resume_from = last_ckpt
+            train(train_args)
+
+            # Track the latest checkpoint for the next batch
+            checkpoints = sorted(output_dir.glob("lora_epoch_*"))
+            if checkpoints:
+                progress["last_checkpoint"] = str(checkpoints[-1])
+        else:
+            logger.warning(
+                f"No training data found in '{data_dir}'. Skipping training for batch {current_batch}."
+            )
+
+        # Step 4: Persist progress
+        start_index += len(batch_paths)
+        progress["batches_completed"] += 1
+        progress["images_processed"] = start_index
+        batches_run += 1
+
+        with open(progress_file, "w", encoding="utf-8") as f:
+            json.dump(progress, f, indent=2)
+
+        logger.info(f"Batch {current_batch} complete. Progress saved to '{progress_file}'.")
+
+    logger.info(
+        f"Batch pipeline finished. "
+        f"Total batches completed: {progress['batches_completed']}."
+    )
+
+
+# ---------------------------------------------------------------------------
 # CLI Entry Point
 # ---------------------------------------------------------------------------
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Fine-tune Stable Video Diffusion with LoRA on landslide training data"
+    )
+
+    # Mode selection
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="full",
+        choices=["full", "batch"],
+        help=(
+            "Training mode: 'full' trains on all available data in --data-dir (default); "
+            "'batch' runs the iterative pipeline: download → generate → train → repeat"
+        ),
     )
 
     # Data arguments
@@ -490,7 +618,7 @@ def main() -> None:
     parser.add_argument("--learning-rate", type=float, default=1e-4,
                         help="Learning rate (default: 1e-4)")
     parser.add_argument("--batch-size", type=int, default=1,
-                        help="Per-device batch size (default: 1)")
+                        help="Per-device DataLoader batch size (default: 1)")
     parser.add_argument("--gradient-accumulation-steps", type=int, default=4,
                         help="Gradient accumulation steps (default: 4)")
     parser.add_argument("--mixed-precision", type=str, default="fp16",
@@ -522,8 +650,46 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42,
                         help="Random seed for reproducibility (default: 42)")
 
+    # Batch pipeline arguments (only used when --mode batch)
+    parser.add_argument(
+        "--image-batch-size",
+        type=int,
+        default=5,
+        help="Number of raw images to process per batch in batch mode (default: 5)",
+    )
+    parser.add_argument(
+        "--batches-to-process",
+        type=int,
+        default=-1,
+        help="Number of batches to run in batch mode (-1 = all, default: -1)",
+    )
+    parser.add_argument(
+        "--images-dir",
+        type=str,
+        default=None,
+        help="Directory containing raw images for batch mode (required when --mode batch)",
+    )
+    parser.add_argument(
+        "--batch-progress-file",
+        type=str,
+        default="batch_progress.json",
+        help="JSON file used to track batch pipeline progress (default: batch_progress.json)",
+    )
+    parser.add_argument(
+        "--generation-duration",
+        type=int,
+        default=4,
+        help="Video duration in seconds when generating training data in batch mode (default: 4)",
+    )
+
     args = parser.parse_args()
-    train(args)
+
+    if args.mode == "batch":
+        if args.images_dir is None:
+            parser.error("--images-dir is required when --mode batch")
+        run_batch_pipeline(args)
+    else:
+        train(args)
 
 
 if __name__ == "__main__":

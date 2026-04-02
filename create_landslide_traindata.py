@@ -370,6 +370,64 @@ def process_image_worker(args: tuple) -> None:
     process_image(*args)
 
 
+def process_image_batch(
+    image_paths: list[str],
+    output_dir: str,
+    duration: int = 4,
+    fps: int = 14,
+    target_width: int = 512,
+    target_height: int = 512,
+) -> list[dict]:
+    """
+    Process a batch of images sequentially and return metadata for each.
+
+    For every image the function calls :func:`process_image` and collects
+    information about the files that were created (or already existed).
+
+    Args:
+        image_paths: List of paths to input image files
+        output_dir: Root directory for training data output
+        duration: Video duration in seconds
+        fps: Frames per second
+        target_width: Target image width in pixels
+        target_height: Target image height in pixels
+
+    Returns:
+        List of dicts, one per input image, each containing:
+            - ``source_path``: path to the preprocessed source PNG
+            - ``video_path``: path to the generated MP4 video
+            - ``frames_dir``: path to the directory of individual frames
+            - ``num_frames``: number of frame files saved
+            - ``success``: True if all three outputs exist
+    """
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    results = []
+    for filepath in image_paths:
+        name = Path(filepath).stem
+        source_png = output_path / f"source_{name}.png"
+        video_mp4 = output_path / f"video_{name}.mp4"
+        frames_dir = output_path / f"frames_{name}"
+
+        process_image(filepath, output_dir, duration, fps, target_width, target_height)
+
+        success = source_png.exists() and video_mp4.exists() and frames_dir.exists()
+        num_frames = sum(1 for _ in frames_dir.glob("frame_*.png")) if frames_dir.exists() else 0
+
+        results.append(
+            {
+                "source_path": str(source_png),
+                "video_path": str(video_mp4),
+                "frames_dir": str(frames_dir),
+                "num_frames": num_frames,
+                "success": success,
+            }
+        )
+
+    return results
+
+
 # ---------------------------------------------------------------------------
 # Main Entry Point
 # ---------------------------------------------------------------------------
