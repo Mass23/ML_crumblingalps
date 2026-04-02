@@ -153,10 +153,10 @@ def simulate_landslides(
 
     h, w, _ = base_image.shape
     active_landslides = []
-    MAX_ACTIVE = 150
+    MAX_ACTIVE = 500
 
     def start_landslide(
-        block_size: int = 200,
+        block_size: int = 400,
         x: Optional[int] = None,
         y: Optional[int] = None,
         generation: int = 0,
@@ -179,8 +179,8 @@ def simulate_landslides(
             x = random.randint(0, w - block_size)
         if y is None:
             y = random.randint(0, h // 2 - block_size)
-        fall_distance = random.randint(100, max_fall_dist)
-        duration_frames = random.randint(20, 100)
+        fall_distance = random.randint(150, max_fall_dist)
+        duration_frames = random.randint(20, 200)
         dy_per_frame = fall_distance / duration_frames
         dx_per_frame = random.uniform(-1.0, 1.0)
 
@@ -206,7 +206,7 @@ def simulate_landslides(
 
         if len(active_landslides) < MAX_ACTIVE:
             if random.random() < 0.05:
-                active_landslides.append(start_landslide(random.randint(100, 400)))
+                active_landslides.append(start_landslide(random.randint(100, 500)))
 
         new_landslides = []
         for ls in active_landslides:

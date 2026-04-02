@@ -18,6 +18,7 @@ ENV/
 
 # Data (large files, not tracked)
 data/raw-images/
+data/landslide-videos/
 data/training/
 data/attributions.json
 
@@ -29,6 +30,7 @@ outputs/
 videos/
 gifs/
 final-images/
+data/
 
 # IDE
 .idea/

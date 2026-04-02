@@ -19,7 +19,9 @@ from urllib.parse import urlparse
 
 # Wikimedia Commons API endpoint
 WIKIMEDIA_API = "https://commons.wikimedia.org/w/api.php"
-
+HEADERS = {
+            "User-Agent": "MLCrumblingAlps/1.0 (https://github.com/Mass23/ML_crumblingalps; massimo.bourquin@gmail.com) requests/2.31.0"
+        }
 # Search queries to find diverse Alps/mountain images
 SEARCH_QUERIES = [
     "Alps mountains landscape",
@@ -32,7 +34,16 @@ SEARCH_QUERIES = [
     "Mountain panorama landscape",
     "Alps snow peaks",
     "Alpine valley landscape",
+    "Switzerland Alps",
 ]
+
+EXCLUDE_KEYWORDS = ["New Zealand", "new zealand", "Zealand", "NZ_Southern_Alp", "NZ", "new_zealand", 'New_Zealand',
+                    "New zeal", "new zeal", "New_zeal", "new_zeal", 
+                    "Norway", "norway", "norwegian alps", "Norwegian_Alps", "norwegian_alps"]
+
+def is_valid_filename(filename):
+    filename_lower = filename.lower()
+    return not any(keyword in filename_lower for keyword in EXCLUDE_KEYWORDS)
 
 # Rate limiting: 1 second between requests
 REQUEST_DELAY = 1.0
@@ -62,11 +73,16 @@ def search_wikimedia_images(query: str, limit: int = 50) -> list[dict]:
     }
 
     try:
-        response = requests.get(WIKIMEDIA_API, params=params, timeout=30)
+        response = requests.get(WIKIMEDIA_API, params=params, timeout=30, headers=HEADERS)
         response.raise_for_status()
         data = response.json()
         pages = data.get("query", {}).get("pages", {})
-        return list(pages.values())
+        filtered_pages = {
+            page_id: page
+            for page_id, page in pages.items()
+            if is_valid_filename(page.get("title", ""))
+        }
+        return list(filtered_pages.values())
     except Exception as e:
         print(f"  Error searching for '{query}': {e}")
         return []
@@ -151,8 +167,7 @@ def download_image(image_info: dict, output_dir: Path) -> bool:
         return True
 
     try:
-        headers = {"User-Agent": "ML_crumblingalps/1.0 (educational ML project; contact via GitHub)"}
-        response = requests.get(image_info["download_url"], headers=headers, timeout=60, stream=True)
+        response = requests.get(image_info["download_url"], headers=HEADERS, timeout=60, stream=True)
         response.raise_for_status()
 
         with open(output_path, "wb") as f:
